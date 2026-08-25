@@ -27,7 +27,6 @@ jobs:
             https://huggingface.co/Qwen/Qwen2.5-0.5B-GGUF/resolve/main/qwen2.5-0.5b-q4_k_m.gguf
 
       - name: Run batch-size balancer (A/B)
-        working-directory: initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package
         env:
           LLAMA: /tmp/llama.cpp/build/bin/llama-server
           MODEL: qwen2.5-0.5b-q4_k_m.gguf
@@ -42,5 +41,5 @@ jobs:
         with:
           name: balancer-evidence
           path: |
-            initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package/results/balancer.json
-            initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package/assets/balancer_plot.png
+            results/balancer.json
+            assets/balancer_plot.png
