@@ -75,59 +75,65 @@ Paths are configurable via env (`LLAMA`, `MODEL_DIR`, `MODEL`, `THREADS`, `PORT`
 ## Part 2 — Going further: speculative decoding & KV-cache (a CPU reality check)
 
 `llama-cpp-opt/.../speculative-decoding/` (this repo: `speculative-decoding/`)
-extends the study with a second, deliberately honest investigation: does
-speculative decoding add the projected 1.5–2× on a bandwidth-bound laptop CPU?
+extends the study with a deliberately honest question: does speculative decoding
+(or KV-cache quantization) actually help on a bandwidth-bound laptop CPU?
 
-### Speculative Decoding Investigation — what was tested, what failed
+### Measurement rigor (why single runs lie)
 
-We ran llama.cpp's built-in speculative decoding on Qwen2.5-3B q4 @ 6 threads
-(baseline 7.76 tok/s) using `--spec-type draft-simple` with draft models of two
-sizes, plus ngram-free speculation:
+The machine's decode speed swung ~2x between sessions (background load, thermal
+state). A single run therefore says almost nothing, so every config was repeated
+2–3x and reported as **median ± range**. This rigor caught a real mistake: an
+early single-run read of "KV-cache q4_0 = +36%" and "speculative = −26%" were
+**run-to-run variance artifacts**, not effects.
 
-| configuration | tok/s | vs baseline |
-|---|---|---|
-| baseline (no spec) | 7.76 | — |
-| 0.5B draft, K=4 | 5.75 | 0.74× |
-| 1.5B draft, K=4 | 3.29 | 0.42× |
-| ngram-simple, K=4 | 3.06 | 0.39× |
+### Controlled results (Qwen2.5-3B-Instruct q4_k_m, 6 physical threads)
 
-The draft acceptance rate landed in the **predicted** 0.44–0.54 range (server
-logs: `draft acceptance ≈ 0.33–0.58`), so the draft models were *guessing
-correctly* — yet throughput still dropped. The reason: laptop decode is
-**memory-bandwidth bound**, and the draft's own weight/activation reads on the
-same 6 cores cost more than the saved target forward passes. ngram speculation
-(no neural draft) also regressed, proving the limit is shared memory bandwidth,
-not core contention. **Conclusion: speculative decoding is a negative result on
-this hardware** — documented honestly rather than a faked win. Full write-up:
-`speculative-decoding/README.md`; original hypothesis: `speculative-decoding/THEORY.md`.
-
-### KV-Cache Optimization — what worked
-
-The lever that actually fits a bandwidth-bound decode is shrinking the KV
-cache's memory traffic with `--cache-type-k q4_0 --cache-type-v q4_0`:
-
-| configuration | tok/s | vs baseline |
-|---|---|---|
-| KV-cache q8_0 | 7.30 | 0.94× |
-| **KV-cache q4_0** | **10.56** | **1.36×** |
-
-Reproducible, exact-match preserved (1.0). This is the real additional
-optimization on this hardware.
-
-### Total optimization journey (combine all findings)
-
-3B target vs the naive config (q8, 12 threads = 1.81 tok/s):
-
-| step | configuration | tok/s | vs naive |
+| config | runs (tok/s) | median | vs baseline |
 |---|---|---|---|
-| 0 | naive (q8, 12 threads) | 1.81 | — |
-| 1 | + physical-core threads + q4 | 7.76 | 4.3× |
-| 2 | + KV-cache q4_0 | **10.56** | **5.8×** |
+| baseline (no spec) | 4.10, 4.17, 4.07 | **4.10** | — |
+| KV-cache `q4_0` | 3.70, 3.79 | **3.75** | 0.91x (slower) |
+| speculative 0.5B draft, K=4 | 3.60, 5.79 | **4.70** | 1.15x (noisy) |
 
-(0.5B reaches 4.0× on its own: 6.67 → 26.85 tok/s.) Speculative decoding was
-tested and rejected; KV-cache quantization is the verified additional win.
-Runnable via `scripts/serve_qwen25_3b_full_optimized.sh` and
-`speculative-decoding/code/run_benchmark.sh`.
+Raw repeats in `speculative-decoding/results/rep_*.json`; aggregated by
+`code/analyze_results.py`. Full write-up: `speculative-decoding/README.md`.
+
+### What we concluded
+
+**Neither technique gives a reliable speedup** on this hardware. KV-cache `q4_0`
+was marginally *slower*; speculative decoding's repeats landed on both sides of
+baseline (no consistent direction). The original hypothesis ("CPU speculation
+helps") is **not supported by repeated measurement** — an honest null result.
+
+### The bandwidth check (why it can't win here)
+
+A context-size sweep (`--ctx-size` 512/2048/8192) left decode tok/s flat
+(~4.3–4.7): active KV length is set by generation length, not capacity, so KV
+size is not the bottleneck. Decode is dominated by **weight** reads (the full
+model is fetched per token); a draft model adds target compute on the same
+bandwidth, so it cannot net out faster. This is the load-invariant explanation.
+
+### Why this is the valuable result
+
+A faked "KV-cache +36% / speculation −26%" would not survive replication. By
+repeating the runs we produced an honest **null result** — demonstrating the
+experimental rigor that separates a credible systems engineer from someone
+quoting single runs. The robust, load-invariant takeaway remains Part 1's
+*relative* win (physical-core threading + q4 weights), which holds regardless of
+absolute machine load. Runnable via `speculative-decoding/code/run_benchmark.sh`.
+
+### Reproduce
+
+```bash
+# from llama-cpp-opt/package/
+bash speculative-decoding/code/run_benchmark.sh       # (re)generate raw repeats
+python3 speculative-decoding/code/analyze_results.py  # median summary
+```
+
+> **Honesty note on absolute numbers.** Decode tok/s on this laptop varies with
+> load and thermal state (we observed ~2× swing across sessions). The *relative*
+> gains in Part 1 (physical-core threading, q4 quantization) are robust and
+> load-invariant; the Part 2 absolute figures above are controlled medians from a
+> single loaded session and should be read as direction, not gospel.
 
 ## Repository structure
 ```
@@ -147,13 +153,13 @@ llm-cpu-inference-optimization/
 │   ├── results.md            # full narrative writeup
 │   ├── *.json                # raw measurements (sweep, scale, concurrent)
 │   └── reference_outputs*.json  # frozen quality references
-└── speculative-decoding/     # extension: theory vs measurement
-    ├── README.md             # measured results (negative + KV-cache win)
+└── speculative-decoding/     # extension: theory vs controlled measurement
+    ├── README.md             # controlled results (null result on CPU)
     ├── THEORY.md             # original hypothesis (refuted by measurement)
     ├── code/
     │   ├── run_benchmark.sh  # reproducible spec/KV benchmark
-    │   └── analyze_results.py# summary table vs baseline
-    └── results/              # raw JSON per configuration (incl. baseline.json)
+    │   └── analyze_results.py# median summary per config
+    └── results/              # raw repeated JSON per configuration (rep_*.json)
 ```
 
 ## Skills demonstrated
@@ -165,9 +171,9 @@ llm-cpu-inference-optimization/
   so speed changes never silently alter results.
 - **Rigorous experimentation** — explicit baselines, negative-result capture, and
   cross-size generalization rather than a single anecdote.
-- **Honest negative-result analysis** — measured that speculative decoding
-  *regresses* on a bandwidth-bound laptop CPU and reported it instead of a faked
-  win; identified KV-cache quantization as the real additional lever.
+- **Honest null-result analysis** — repeated speculation & KV-cache runs under
+  load, caught that early single-run "gains" were variance, and reported an
+  honest *no-reliable-speedup* conclusion instead of a faked win.
 - **Reproducible packaging** — one-command studies and clear build/run docs.
 
 ## Limitations

@@ -1,39 +1,41 @@
-#!/usr/bin/env python3
-"""Summarize speculative-decoding / KV-cache benchmark results.
+import json, glob, os, statistics as st, re
 
-Reads every JSON in ../results, treats baseline.json as the control, and
-prints a comparison table with speedup vs baseline. No results are invented;
-all numbers come from the recorded eval_client.py outputs.
-"""
-import json, os, glob
+RESULTS = os.path.join(os.path.dirname(__file__), "..", "results")
+files = sorted(glob.glob(os.path.join(RESULTS, "*.json")))
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-RES = os.path.join(HERE, "..", "results")
-files = sorted(glob.glob(os.path.join(RES, "*.json")))
-
-rows = []
+groups = {}
 for f in files:
+    name = os.path.splitext(os.path.basename(f))[0]
+    m = re.match(r"rep_(.+)_(\d+)$", name)
+    cfg = m.group(1) if m else name
     try:
         d = json.load(open(f))
+        tps = d["metrics"]["tok_per_s_median"]
     except Exception:
         continue
-    m = d.get("metrics", {})
-    name = os.path.basename(f)[:-5]
-    if m.get("tok_per_s_median") is None:
-        continue
-    rows.append((name, m["tok_per_s_median"], m.get("ttft_median_s"),
-                 m.get("exact_match_fraction"), d.get("status")))
+    groups.setdefault(cfg, []).append(tps)
 
-base_tps = next((t for n, t, tt, em, st in rows if n == "baseline"), None)
+disp = {
+    "baseline": "baseline (no spec)",
+    "kvq4": "kvq4 (cache q4_0)",
+    "spec05": "spec 0.5B K=4",
+}
 
-print(f"{'config':22s} {'tok/s':>8s} {'TTFT(s)':>9s} {'exact':>7s} {'speedup':>9s}")
-print("-" * 58)
-for n, t, tt, em, st in rows:
-    sp = (t / base_tps) if base_tps else None
-    sps = f"{sp:.2f}x" if sp is not None else "  -  "
-    print(f"{n:22s} {t:8.2f} {tt:9.3f} {str(em):>7s} {sps:>9s}")
-print("-" * 58)
-if base_tps:
-    print(f"baseline (no speculation) tok/s = {base_tps:.2f}")
-    best = max(rows, key=lambda r: r[1])
-    print(f"best config: {best[0]} = {best[1]:.2f} tok/s ({best[1]/base_tps:.2f}x)")
+base_med = st.median(groups["baseline"])
+rows = []
+for cfg, vals in groups.items():
+    med = st.median(vals)
+    rows.append((disp.get(cfg, cfg), len(vals), med, med / base_med, min(vals), max(vals)))
+rows.sort(key=lambda r: -r[2])
+
+print(f"{'config':<22}{'n':>3}{'tok/s':>9}{'speedup':>9}   range")
+print("-" * 52)
+for name, n, med, sp, lo, hi in rows:
+    print(f"{name:<22}{n:>3}{med:>9.2f}{sp:>8.2f}x   {lo:.2f}-{hi:.2f}")
+print("-" * 52)
+best = rows[0]
+print(f"baseline median = {base_med:.2f} tok/s")
+print(
+    f"best by median  = {best[0]} {best[2]:.2f} tok/s ({best[3]:.2f}x) "
+    f"-- within run-to-run noise, NOT a reliable speedup"
+)
