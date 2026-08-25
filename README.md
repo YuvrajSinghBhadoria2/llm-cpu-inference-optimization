@@ -14,7 +14,9 @@ core count`, `q8`) were the *worst* configuration tested.
 | Qwen2.5-1.5B | 2.91 tok/s | **7.36 tok/s** | 2.5× |
 | Qwen2.5-3B   | 1.81 tok/s | **7.76 tok/s** | **4.3×** |
 
-## What actually moved the needle
+## Part 1 — Threading & quantization (the 4× win)
+
+### What actually moved the needle
 1. **`--threads` = physical cores, NOT logical.** Using all 12 logical threads
    (Hyper-Thread siblings) on a 6-core chip *collapsed* throughput — 6.7 tok/s
    vs 17.4 at 6 threads for 0.5B, and 1.8 vs 3.6 for 3B. Hyper-Thread contention
@@ -136,6 +138,30 @@ python3 speculative-decoding/code/speculative_server.py --K 4 --max-tokens 32  #
 > load-invariant; the Part 2 absolute figures above are controlled medians from a
 > single loaded session and should be read as direction, not gospel.
 
+## Part 3 — Bandwidth characterization (why CPU decode is bound)
+
+Part 2 showed speculation and KV-cache quant don't help. This study isolates
+*why*. We swept `--ctx-size` (the KV-cache capacity) from 512 → 8192 while
+holding the prompt + 128 generated tokens fixed, and measured decode tok/s.
+
+| ctx-size | decode tok/s |
+|---|---|
+| 512   | 4.27 |
+| 2048  | 4.72 |
+| 8192  | 4.43 |
+
+Decode speed is **flat** across a 16× change in KV capacity. That is the tell:
+during generation the *active* KV length equals the prompt + output length, not
+the allocated capacity, so KV-cache size is not the bottleneck. Decode cost is
+dominated by **weight** reads — the full ~2 GB model is pulled from memory
+*every single token*. A draft model (Part 2) only adds target compute on that
+same bandwidth, which is why it cannot net out faster here. This is the
+load-invariant root cause behind both the Part 1 win (smaller q4 weights = less
+memory traffic per token) and the Part 2 null result.
+
+Raw sweep: `bandwidth-characterization/results/ctx_*.json`; summary script
+`bandwidth-characterization/code/analyze.py`.
+
 ## Repository structure
 ```
 llm-cpu-inference-optimization/
@@ -154,7 +180,11 @@ llm-cpu-inference-optimization/
 │   ├── results.md            # full narrative writeup
 │   ├── *.json                # raw measurements (sweep, scale, concurrent)
 │   └── reference_outputs*.json  # frozen quality references
-└── speculative-decoding/     # extension: theory vs controlled measurement
+├── bandwidth-characterization/  # Part 3: why decode is bandwidth-bound
+│   ├── README.md             # context-size sweep writeup
+│   ├── code/analyze.py       # prints decode tok/s vs ctx-size
+│   └── results/              # raw ctx_512/2048/8192.json
+└── speculative-decoding/     # Part 2: theory vs controlled measurement
     ├── README.md             # controlled results (null result on CPU)
     ├── THEORY.md             # original hypothesis (refuted by measurement)
     ├── code/
