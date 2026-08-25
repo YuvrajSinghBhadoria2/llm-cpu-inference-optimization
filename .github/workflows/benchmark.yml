@@ -23,13 +23,16 @@ jobs:
       - name: Fetch a small GGUF model
         run: |
           mkdir -p ~/models
-          curl -L -o ~/models/qwen2.5-0.5b-q4_k_m.gguf \
-            https://huggingface.co/Qwen/Qwen2.5-0.5B-GGUF/resolve/main/qwen2.5-0.5b-q4_k_m.gguf
+          curl -L -o ~/models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+            https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf
+          # fail loudly if the download was an error page, not a real GGUF
+          head -c 4 ~/models/qwen2.5-0.5b-instruct-q4_k_m.gguf | grep -q GGUF || \
+            (echo "downloaded file is not a valid GGUF" && exit 1)
 
       - name: Run batch-size balancer (A/B)
         env:
           LLAMA: /tmp/llama.cpp/build/bin/llama-server
-          MODEL: qwen2.5-0.5b-q4_k_m.gguf
+          MODEL: qwen2.5-0.5b-instruct-q4_k_m.gguf
           CONCURRENCY: 8
           MAX_TOKENS: 32
         run: |
