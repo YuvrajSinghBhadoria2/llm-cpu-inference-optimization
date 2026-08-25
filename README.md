@@ -89,7 +89,7 @@ we built the study around *reproducibility*:
 Peak is at the **6 physical cores**; jumping to 12 *logical* threads collapses
 to 6.7 tok/s (Hyper-Thread siblings contend for the same physical core).
 
-![Thread-count sweep — measured medians (0.5B q4)](assets/figure_threads_bandwidth.png)
+![Thread-count sweep — measured medians (0.5B q4)](https://raw.githubusercontent.com/YuvrajSinghBhadoria2/llm-cpu-inference-optimization/master/assets/figure_threads_bandwidth.png)
 
 **Quantization — Qwen2.5-3B at 6 threads:** q8 = 3.64 → q4 = 7.76 tok/s
 (**2.1×** from weights alone); the full naive→optimized jump is 1.81 → 7.76 =
@@ -110,7 +110,7 @@ parallelism under load. The `scripts/balancer.py` module automates this
 decision (recommends `--parallel` from the live request count) and the plot
 below is generated from real measured data:
 
-![Batch-size balancer A/B — measured](assets/balancer_plot.png)
+![Batch-size balancer A/B — measured](https://raw.githubusercontent.com/YuvrajSinghBhadoria2/llm-cpu-inference-optimization/master/assets/balancer_plot.png)
 
 ### 4.2 Part 2: Speculative decoding & KV-cache (controlled)
 
