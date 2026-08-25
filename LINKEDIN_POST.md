@@ -28,6 +28,7 @@ fully reproducible, with zero quality loss.
 What actually worked:
 - `--threads` = physical cores, NOT logical. Hyper-Threading *collapsed* throughput.
 - `q4` over `q8`. Smaller weights = less memory traffic per token.
+- Batching under concurrency: a load-aware `--parallel` gave **3.1× more aggregate throughput and ~8.6× lower tail latency** with 8 concurrent users (vs `--parallel 1`) — the one technique that *did* add a reliable win, and it's now automated in the repo.
 - Result: 2.5–4.3× faster decode at identical output (verified against a frozen reference).
 
 Then I tested the trendy technique — speculative decoding — expecting 1.5–2×.
