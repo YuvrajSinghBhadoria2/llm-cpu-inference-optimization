@@ -29,6 +29,9 @@ jobs:
           head -c 4 ~/models/qwen2.5-0.5b-instruct-q4_k_m.gguf | grep -q GGUF || \
             (echo "downloaded file is not a valid GGUF" && exit 1)
 
+      - name: Install python deps
+        run: python3 -m pip install --quiet matplotlib
+
       - name: Run batch-size balancer (A/B)
         env:
           LLAMA: /tmp/llama.cpp/build/bin/llama-server

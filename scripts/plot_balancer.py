@@ -2,9 +2,14 @@
 """Plot the balancer A/B evidence: tail latency and aggregate throughput for
 --parallel 1 vs 8 under fixed concurrency (from results/balancer.json)."""
 import json, sys
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:
+    print("matplotlib not installed; skipping plot (JSON evidence still saved)",
+          file=sys.stderr)
+    sys.exit(0)
 
 path = sys.argv[1] if len(sys.argv) > 1 else "results/balancer.json"
 out = sys.argv[2] if len(sys.argv) > 2 else "assets/balancer_plot.png"
