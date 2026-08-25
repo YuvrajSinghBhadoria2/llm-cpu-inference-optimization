@@ -72,12 +72,17 @@ Paths are configurable via env (`LLAMA`, `MODEL_DIR`, `MODEL`, `THREADS`, `PORT`
 - Size `--parallel` to expected concurrency, not to 1.
 - Validate the BLAS/Metal backend on the actual hardware; "default build" can crash.
 
-## Extension: speculative decoding & KV-cache quantization (a CPU reality check)
-`speculative-decoding/` extends this study with a second, deliberately honest
-investigation: does speculative decoding add the projected 1.5–2× on a
-bandwidth-bound laptop CPU?
+## Part 2 — Going further: speculative decoding & KV-cache (a CPU reality check)
 
-**No — it regresses.** Measured on Qwen2.5-3B q4 @ 6 threads (baseline 7.76 tok/s):
+`llama-cpp-opt/.../speculative-decoding/` (this repo: `speculative-decoding/`)
+extends the study with a second, deliberately honest investigation: does
+speculative decoding add the projected 1.5–2× on a bandwidth-bound laptop CPU?
+
+### Speculative Decoding Investigation — what was tested, what failed
+
+We ran llama.cpp's built-in speculative decoding on Qwen2.5-3B q4 @ 6 threads
+(baseline 7.76 tok/s) using `--spec-type draft-simple` with draft models of two
+sizes, plus ngram-free speculation:
 
 | configuration | tok/s | vs baseline |
 |---|---|---|
@@ -85,20 +90,43 @@ bandwidth-bound laptop CPU?
 | 0.5B draft, K=4 | 5.75 | 0.74× |
 | 1.5B draft, K=4 | 3.29 | 0.42× |
 | ngram-simple, K=4 | 3.06 | 0.39× |
+
+The draft acceptance rate landed in the **predicted** 0.44–0.54 range (server
+logs: `draft acceptance ≈ 0.33–0.58`), so the draft models were *guessing
+correctly* — yet throughput still dropped. The reason: laptop decode is
+**memory-bandwidth bound**, and the draft's own weight/activation reads on the
+same 6 cores cost more than the saved target forward passes. ngram speculation
+(no neural draft) also regressed, proving the limit is shared memory bandwidth,
+not core contention. **Conclusion: speculative decoding is a negative result on
+this hardware** — documented honestly rather than a faked win. Full write-up:
+`speculative-decoding/README.md`; original hypothesis: `speculative-decoding/THEORY.md`.
+
+### KV-Cache Optimization — what worked
+
+The lever that actually fits a bandwidth-bound decode is shrinking the KV
+cache's memory traffic with `--cache-type-k q4_0 --cache-type-v q4_0`:
+
+| configuration | tok/s | vs baseline |
+|---|---|---|
 | **KV-cache q4_0** | **10.56** | **1.36×** |
 
-The draft acceptance rate landed in the *predicted* 0.44–0.54 range, so the
-draft quality was fine — but laptop decode is **memory-bandwidth bound**, and the
-draft's own weight/activation reads on the same 6 cores cost more than the saved
-target forward passes. ngram speculation (no neural draft) also regressed,
-proving the limit is shared memory bandwidth, not core contention. The real,
-reproducible additional lever on this hardware is **KV-cache quantization**
-(`--cache-type-k q4_0 --cache-type-v q4_0`, +36%, exact-match preserved).
+Reproducible, exact-match preserved (1.0). This is the real additional
+optimization on this hardware.
 
-End-to-end 3B vs naive (q8, 12 threads = 1.81 tok/s): **1.81 → 10.56 ≈ 5.8×**
-(threads + q4 + KV-cache quant). See `speculative-decoding/README.md` for the
-full theory-vs-measurement writeup and `speculative-decoding/THEORY.md` for the
-original hypothesis.
+### Total optimization journey (combine all findings)
+
+3B target vs the naive config (q8, 12 threads = 1.81 tok/s):
+
+| step | configuration | tok/s | vs naive |
+|---|---|---|---|
+| 0 | naive (q8, 12 threads) | 1.81 | — |
+| 1 | + physical-core threads + q4 | 7.76 | 4.3× |
+| 2 | + KV-cache q4_0 | **10.56** | **5.8×** |
+
+(0.5B reaches 4.0× on its own: 6.67 → 26.85 tok/s.) Speculative decoding was
+tested and rejected; KV-cache quantization is the verified additional win.
+Runnable via `scripts/serve_qwen25_3b_full_optimized.sh` and
+`speculative-decoding/code/run_benchmark.sh`.
 
 ## Repository structure
 ```
@@ -110,6 +138,7 @@ llm-cpu-inference-optimization/
 │   ├── serve_qwen25_instruct.sh   # optimized launcher (physical-core threads)
 │   ├── serve_qwen25_coder.sh
 │   ├── serve_qwen25_math.sh
+│   ├── serve_qwen25_3b_full_optimized.sh  # 3B: threads + KV-cache q4_0
 │   ├── run_study.sh          # baseline + 3 candidates
 │   ├── run_sweep.sh          # thread-count sweep
 │   └── scale_study.sh        # 1.5B + 3B generalization
@@ -120,7 +149,10 @@ llm-cpu-inference-optimization/
 └── speculative-decoding/     # extension: theory vs measurement
     ├── README.md             # measured results (negative + KV-cache win)
     ├── THEORY.md             # original hypothesis (refuted by measurement)
-    └── results/              # raw JSON per configuration
+    ├── code/
+    │   ├── run_benchmark.sh  # reproducible spec/KV benchmark
+    │   └── analyze_results.py# summary table vs baseline
+    └── results/              # raw JSON per configuration (incl. baseline.json)
 ```
 
 ## Skills demonstrated
