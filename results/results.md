@@ -57,9 +57,14 @@ config including q4, so no quality regression):
 
 ## Recommended defaults (baked into `scripts/serve_qwen25_*.sh`)
 - `--threads $(sysctl -n hw.physicalcpu)` (6 on this machine) — never `hw.ncpu`.
+- `--cpu-strict 1` to pin worker threads to physical cores (~5% extra, see Part 4).
 - `--parallel 1` for single-stream interactive use.
-- `q8_0` for quality; `q4_k_m` for max speed (set `MODEL=...` before launching).
+- **`q4_K_M` for max speed** (Part 4: fastest scheme, identical greedy output to
+  `q8_0`); `q8_0` only if a harder task shows 4-bit drift. Keep default mmap.
 - Build llama.cpp **without Metal** on this Intel Mac: `-DGGML_METAL=OFF -DGGML_ACCELERATE=ON`.
+
+See `results-part4.md` for the quantization-scheme sweep (q4_0 / q4_K_M /
+q5_K_M / iq4_xs / q8_0), memory-loading, and CPU-affinity evidence.
 
 ## Reproduce
 ```

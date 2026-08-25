@@ -1,0 +1,22 @@
+[
+  {
+    "prompt": "Explain what a vector database is in two sentences.",
+    "output": ""
+  },
+  {
+    "prompt": "Write a short Python function that reverses a linked list.",
+    "output": ""
+  },
+  {
+    "prompt": "Summarize the causes of the French Revolution in one paragraph.",
+    "output": ""
+  },
+  {
+    "prompt": "List three benefits of test-driven development.",
+    "output": ""
+  },
+  {
+    "prompt": "Describe how gradient descent works in plain language.",
+    "output": ""
+  }
+]

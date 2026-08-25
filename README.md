@@ -137,7 +137,42 @@ Decode tok/s vs `--ctx-size` (KV-cache capacity), fixed prompt + 128 tokens:
 **Flat across a 16× capacity change** — decode is not KV-bound. (Same figure,
 right panel, above.)
 
-### 4.4 From-scratch decoder (Project 4)
+### 4.4 Part 4: Quantization-scheme sweep, memory loading, CPU affinity
+
+Refines Part 1. Same protocol, frozen `q8_0@t6` reference per size, **3 repeats
+per config** (Part 2's variance lesson). Full evidence: `results-part4.md`,
+`results/part4_*.json`.
+
+**0.5B schemes @ t6 (tok/s median, overlap = 1.000 vs q8_0@t6 for all):**
+
+| scheme | tok/s | note |
+|---|---|---|
+| **q4_K_M** | **28.0** | fastest; identical output to q8_0 |
+| q4_0 | 26.6 | plain 4-bit, slower than K-quant |
+| iq4_xs | 24.4 | "smarter" nonlinear 4-bit — *not* faster (dequant cost) |
+| q5_K_M | 17.8 | 5-bit = more traffic = no speed gain over q8_0 |
+| q8_0 | 18.8 | 8-bit baseline |
+
+**Takeaway:** not "any 4-bit" — **`q4_K_M` specifically** is the speed-optimal
+scheme; heavier `q5_K_M`/`q8_0` give *no* speed benefit on this bandwidth-bound
+CPU, with zero quality difference on greedy prompts (overlap 1.000 everywhere).
+
+**Memory loading & affinity (0.5B q4_K_M @ t6):**
+
+| config | tok/s |
+|---|---|
+| default mmap | 26.1 |
+| `--no-mmap --mlock` | 25.0 (slightly slower — keep mmap) |
+| `--cpu-strict 1` (pin to physical cores) | **27.3** (new ~5% win) |
+
+**3B generalizes** (t6): q4_K_M **5.36** > q4_0 5.21 > q5_K_M 4.80 > q8_0 3.56
+tok/s — same ranking, `q8_0` ~1.5× slower. Corroborates Part 3.
+
+**Rigor note:** 3B `q5_K_M` first returned a corrupt-GGUF artifact (`invalid
+magic`) from an *interrupted* earlier quantize — discarded and regenerated, not
+reported. Parallel to Part 2's variance catch.
+
+### 4.5 From-scratch decoder (Project 4)
 
 We hand-wrote a dual-server speculative decoder (`speculative-decoding/code/
 speculative_server.py`). On K=4, 32 tokens: baseline **7.27** tok/s vs
@@ -161,7 +196,11 @@ L1/L2 cache, reducing total useful work. The fix is trivial and high-leverage:
 
 ### 5.2 `q4` beats `q8` because it moves fewer bytes per token
 **Finding:** at 6 threads, 3B went from 3.64 (q8) to 7.76 tok/s (q4) — a 2.1×
-gain from weights alone.
+gain from weights alone. **Part 4 refines this:** among 4-bit schemes,
+**`q4_K_M` is the speed-optimal** (0.5B 28.0 vs `q4_0` 26.6 vs `iq4_xs` 24.4
+tok/s), and the heavier `q5_K_M`/`q8_0` give *no* speed benefit (more bits =
+more traffic). Quality is identical (overlap 1.000 vs `q8_0`) at every scheme,
+so `q4_K_M` is the default.
 **Why:** generating one token requires reading the *entire* model from RAM.
 `q4` stores each weight in ~4 bits instead of 8, so the model is about half the
 size and **half the bytes must cross the memory bus per token**. Less data moved
@@ -232,7 +271,9 @@ These are the lessons that generalize beyond this one laptop:
 - **On CPU, decode is weight-bandwidth bound, not compute bound.** Optimize
   bytes-per-token (quantize, smaller models), not FLOPs.
 - **Hyper-Threading is anti-throughput for inference.** Match threads to physical
-  cores; the OS default is wrong.
+  cores; the OS default is wrong. Pinning with `--cpu-strict 1` adds ~5% more.
+- **Not all 4-bit is equal.** `q4_K_M` is the speed-optimal scheme here; heavier
+  `q5_K_M`/`q8_0` buy no speed, so pick the smallest K-quant that holds quality.
 - **A single benchmark number is a lie; a median over repeats is a result.**
   Load and thermals move CPU numbers by 2× — anyone quoting one run is guessing.
 - **Negative results are findings.** "Speculation doesn't help here" is a real,
@@ -258,15 +299,22 @@ cmake --build build --target llama-server -j$(sysctl -n hw.ncpu)
 # 3) run the study
 bash scripts/run_study.sh && bash scripts/run_sweep.sh && bash scripts/scale_study.sh
 
-# 4) Part 2 / Project 4
+# 4) Part 4 — quantization-scheme sweep + memory/affinity (≈30 min on this Mac)
+#    extra schemes generated locally from q8_0 (no download):
+~/llama.cpp/build/bin/llama-quantize --allow-requantize \
+    qwen2.5-0.5b-q8_0.gguf qwen2.5-0.5b-q4_0.gguf q4_0   # + q5_k_m, iq4_xs
+bash scripts/run_part4.sh
+#    → results/part4_*.json, results-part4.md
+
+# 5) Part 2 / Project 4
 bash speculative-decoding/code/run_benchmark.sh --label baseline --repeats 3
 python3 speculative-decoding/code/analyze_results.py
 python3 speculative-decoding/code/speculative_server.py --K 4 --max-tokens 32
 
-# 5) Part 3
+# 6) Part 3
 python3 bandwidth-characterization/code/analyze.py
 
-# 6) Batch-size balancer (dynamic --parallel under concurrency)
+# 7) Batch-size balancer (dynamic --parallel under concurrency)
 bash scripts/run_balancer.sh
 python3 scripts/plot_balancer.py results/balancer.json assets/balancer_plot.png
 ```
