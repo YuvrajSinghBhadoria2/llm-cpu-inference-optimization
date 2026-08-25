@@ -1,0 +1,46 @@
+name: CPU inference benchmark
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch: {}
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
+
+      - name: Build llama.cpp (CPU only)
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git /tmp/llama.cpp
+          cmake -S /tmp/llama.cpp -B /tmp/llama.cpp/build -DGGML_OPENMP=ON
+          cmake --build /tmp/llama.cpp/build --target llama-server -j"$(nproc)"
+
+      - name: Fetch a small GGUF model
+        run: |
+          mkdir -p ~/models
+          curl -L -o ~/models/qwen2.5-0.5b-q4_k_m.gguf \
+            https://huggingface.co/Qwen/Qwen2.5-0.5B-GGUF/resolve/main/qwen2.5-0.5b-q4_k_m.gguf
+
+      - name: Run batch-size balancer (A/B)
+        working-directory: initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package
+        env:
+          LLAMA: /tmp/llama.cpp/build/bin/llama-server
+          MODEL: qwen2.5-0.5b-q4_k_m.gguf
+          CONCURRENCY: 8
+          MAX_TOKENS: 32
+        run: |
+          bash scripts/run_balancer.sh
+          python3 scripts/plot_balancer.py results/balancer.json assets/balancer_plot.png
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: balancer-evidence
+          path: |
+            initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package/results/balancer.json
+            initiatives/llm-inference-cpu-mac/projects/llama-cpp-opt/package/assets/balancer_plot.png

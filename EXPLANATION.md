@@ -53,9 +53,15 @@ fact (Part 1) or fails because of it (Parts 2–3).
 2. **Quantize to `q4`.** At the correct thread count, `q4` decodes ~1.5× faster
    than `q8` — smaller weights → less memory traffic per token (this is the
    bandwidth insight in action).
-3. **Batching only helps under concurrency** — single-stream sees no benefit;
-   8 concurrent clients with `--parallel 8` gave +45% aggregate throughput and
-   ~4× lower tail latency.
+ 3. **Batching only helps under concurrency** — single-stream sees no benefit;
+    8 concurrent clients with `--parallel 8` gave +45% aggregate throughput and
+    ~4× lower tail latency. A controlled A/B (`results/balancer.json`) shows the
+    effect even more sharply: `--parallel 1` → 2.66 tok/s agg / 171.6 s p95 TTFT,
+    vs `--parallel 8` → 8.27 tok/s agg / 20.0 s p95 TTFT (**3.1× throughput,
+    ~8.6× lower tail latency**). `scripts/balancer.py` turns this into a reusable
+    controller that picks `--parallel` from the live request count.
+
+![Batch-size balancer A/B — measured](../assets/balancer_plot.png)
 4. **Build without Metal** (stability).
 
 ### Headline result

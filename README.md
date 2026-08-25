@@ -97,7 +97,20 @@ to 6.7 tok/s (Hyper-Thread siblings contend for the same physical core).
 
 **Batching:** a single-stream client sees no benefit from `--parallel`; under 8
 concurrent clients, `--parallel 8` gave **+45% aggregate throughput** and **~4×
-lower tail latency** vs `--parallel 1`.
+lower tail latency** vs `--parallel 1`. A controlled A/B
+(`results/balancer.json`, 8 clients, 64 tokens) is even clearer:
+
+| `--parallel` | aggregate tok/s | p95 TTFT |
+|---|---|---|
+| 1 | 2.66 | 171.6 s |
+| 8 | **8.27** | **20.0 s** |
+
+i.e. **3.1× aggregate throughput and ~8.6× lower tail latency** from raising
+parallelism under load. The `scripts/balancer.py` module automates this
+decision (recommends `--parallel` from the live request count) and the plot
+below is generated from real measured data:
+
+![Batch-size balancer A/B — measured](../assets/balancer_plot.png)
 
 ### 4.2 Part 2: Speculative decoding & KV-cache (controlled)
 

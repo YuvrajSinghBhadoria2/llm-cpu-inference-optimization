@@ -3,7 +3,8 @@
 # Combines every verified lever:
 #   * --threads = physical cores (not Hyper-Thread siblings)
 #   * q4_k_m weights (smaller -> less memory traffic)
-#   * --cache-type-k / --cache-type-v q4_0 (KV-cache quantization, +36%)
+#   * --cache-type-k / --cache-type-v q4_0 (KV-cache quantization; measured as a
+    variance artifact, not a reliable win — kept for completeness only)
 # Build llama.cpp CPU-only (-DGGML_METAL=OFF -DGGML_ACCELERATE=ON) first.
 set -euo pipefail
 LLAMA="${LLAMA:-$HOME/llama.cpp/build/bin/llama-server}"

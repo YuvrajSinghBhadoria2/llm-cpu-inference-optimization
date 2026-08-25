@@ -1,0 +1,31 @@
+{
+  "model": "qwen2.5-3b-instruct-q4_k_m.gguf",
+  "concurrency": 8,
+  "max_tokens": 64,
+  "configs": [
+    {
+      "concurrency": 8,
+      "wall_s": 183.01,
+      "total_tokens": 486,
+      "aggregate_tok_per_s": 2.66,
+      "per_request_tok_per_s_median": 0.63,
+      "per_request_tok_per_s_mean": 0.95,
+      "ttft_median_s": 86.195,
+      "ttft_p95_s": 171.566,
+      "parallel": 1,
+      "recommended_parallel": 8
+    },
+    {
+      "concurrency": 8,
+      "wall_s": 58.02,
+      "total_tokens": 480,
+      "aggregate_tok_per_s": 8.27,
+      "per_request_tok_per_s_median": 1.1,
+      "per_request_tok_per_s_mean": 1.1,
+      "ttft_median_s": 20.0,
+      "ttft_p95_s": 20.003,
+      "parallel": 8,
+      "recommended_parallel": 8
+    }
+  ]
+}
