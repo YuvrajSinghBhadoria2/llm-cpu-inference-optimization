@@ -113,7 +113,7 @@ def main():
     ap.add_argument("--threads", default=None)
     ap.add_argument("--port", type=int, default=8090)
     ap.add_argument("--out", default="results/balancer.json")
-    ap.add_argument("--llama", default=LLAMA_DEFAULT)
+    ap.add_argument("--llama", default=os.environ.get("LLAMA", LLAMA_DEFAULT))
     ap.add_argument("--model-dir", default=MODEL_DIR_DEFAULT)
     ap.add_argument("--recommend-only", type=int, default=None,
                     help="print recommended --parallel for N active requests and exit")
