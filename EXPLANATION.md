@@ -58,9 +58,14 @@ fact (Part 1) or fails because of it (Parts 2–3).
 ### Headline result
 | model | naive (q8, 12T) | optimized (q4, 6T) | speedup |
 |---|---|---|---|
-| Qwen2.5-0.5B | 6.67 | **26.85** | **4.0×** |
+| Qwen2.5-0.5B | 6.9 | **17.4** | **2.5×** |
 | Qwen2.5-1.5B | 2.91 | **7.36** | 2.5× |
 | Qwen2.5-3B | 1.81 | **7.76** | **4.3×** |
+
+> The 0.5B figure was originally quoted as 26.85 tok/s (4.0×) — a favorable
+> single run from a low-load session. The values above are the ones committed as
+> raw evidence in `results/` (typical-load sessions) and are what the report
+> stands behind. Same load-variance lesson as Part 2.
 
 This is the robust, load-invariant core finding (the *relative* gains hold even
 though absolute tok/s drifts with machine load).

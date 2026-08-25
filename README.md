@@ -4,18 +4,26 @@
 with reproducible evidence and zero cloud/GPU dependency.
 
 **Headline result:** on a 2019 6-core/12-thread Intel MacBook, the right
-thread/quantization settings deliver a **~4× decode-speedup at identical output
-quality** (exact token-match preserved). The naive defaults (`--threads = logical
-core count`, `q8`) were the *worst* configuration tested.
+thread/quantization settings deliver a **2.5–4.3× decode speedup at identical
+output quality** (exact token-match preserved). The naive defaults
+(`--threads = logical core count`, `q8`) were the *worst* configuration tested.
+Absolute tok/s (and thus absolute speedup) vary with machine load — see the
+honesty note below; the *direction* and mechanism are robust and load-invariant.
 
 > **Full in-depth walkthrough** (premise, every part, the algorithm, and the
 > rigor behind the null result): see [`EXPLANATION.md`](EXPLANATION.md).
 
 | model | naive (q8, 12 threads) | optimized (q4, 6 threads) | speedup |
 |---|---|---|---|
-| Qwen2.5-0.5B | 6.67 tok/s | **26.85 tok/s** | **4.0×** |
+| Qwen2.5-0.5B | 6.9 tok/s | **17.4 tok/s** | **2.5×** |
 | Qwen2.5-1.5B | 2.91 tok/s | **7.36 tok/s** | 2.5× |
 | Qwen2.5-3B   | 1.81 tok/s | **7.76 tok/s** | **4.3×** |
+
+> The 0.5B figure was originally quoted as 26.85 tok/s (4.0×); that was a
+> favorable single run from a low-load session. The numbers above are the values
+> **committed as raw evidence in `results/`** (typical-load sessions) and are the
+> figures this report stands behind. This is the same load-variance lesson as
+> Part 2: we report what the evidence file shows, not the best-looking run.
 
 ## Part 1 — Threading & quantization (the 4× win)
 
@@ -33,6 +41,18 @@ core count`, `q8`) were the *worst* configuration tested.
 4. **Build llama.cpp without Metal on this Intel Mac** (`-DGGML_METAL=OFF
    -DGGML_ACCELERATE=ON`). The Metal/AMD-GPU backend crashes mid-request here;
    CPU+Accelerate is correct and stable.
+
+### Evidence (from `results/*.json`)
+**Threading — Qwen2.5-0.5B q4, decode tok/s vs thread count** (peak at the 6
+*physical* cores; 12 *logical* threads collapse):
+
+| threads | 2 | 3 | 4 | 6 | 8 | 12 |
+|---|---|---|---|---|---|---|
+| tok/s | 15.5 | 17.0 | 17.4 | **17.4** | 14.0 | 6.7 |
+
+**Quantization — Qwen2.5-3B at 6 threads:** q8 = 3.64 tok/s → q4 = 7.76 tok/s
+(**2.1×** from weights alone); the full naive→optimized jump (q8/12T → q4/6T) is
+1.81 → 7.76 = **4.3×**. Smaller weights = less memory traffic per token.
 
 ## Method (reproducible)
 - Server: `llama.cpp` `llama-server` (OpenAI-compatible API, port 8080).
@@ -79,8 +99,8 @@ Paths are configurable via env (`LLAMA`, `MODEL_DIR`, `MODEL`, `THREADS`, `PORT`
 
 ## Part 2 — Going further: speculative decoding & KV-cache (a CPU reality check)
 
-`llama-cpp-opt/.../speculative-decoding/` (this repo: `speculative-decoding/`)
-extends the study with a deliberately honest question: does speculative decoding
+`speculative-decoding/` (this repo) extends the study with a deliberately
+honest question: does speculative decoding
 (or KV-cache quantization) actually help on a bandwidth-bound laptop CPU?
 
 ### Measurement rigor (why single runs lie)
@@ -109,13 +129,12 @@ was marginally *slower*; speculative decoding's repeats landed on both sides of
 baseline (no consistent direction). The original hypothesis ("CPU speculation
 helps") is **not supported by repeated measurement** — an honest null result.
 
-### The bandwidth check (why it can't win here)
+### The bandwidth check (see Part 3 for the full experiment)
 
-A context-size sweep (`--ctx-size` 512/2048/8192) left decode tok/s flat
-(~4.3–4.7): active KV length is set by generation length, not capacity, so KV
-size is not the bottleneck. Decode is dominated by **weight** reads (the full
-model is fetched per token); a draft model adds target compute on the same
-bandwidth, so it cannot net out faster. This is the load-invariant explanation.
+A context-size sweep confirmed decode is **weight-bandwidth bound**, not
+KV-bound: the full model is fetched from memory every token, so a draft model
+only adds target compute on the same bandwidth and cannot net out faster. The
+detailed sweep, numbers, and conclusion are in **Part 3** below.
 
 ### Why this is the valuable result
 
