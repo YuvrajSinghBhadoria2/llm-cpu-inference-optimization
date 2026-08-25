@@ -15,8 +15,12 @@ backs the post's credibility (it's our own measured data, not a marketing graphi
 
 ---
 
-I optimized LLM inference on a 2019 laptop CPU — no GPU. The most valuable thing
-I learned was that my biggest "win" was fake.
+I optimized LLM inference on a 2019 laptop CPU — no GPU, no cloud. The most
+valuable result wasn't the 4× speedup. It was proving that speedup was fake.
+
+I measured a big win, almost published it, then ran it three more times and
+watched the gain dissolve into noise. That failure taught me more than the win —
+and it's the most credible part of the work.
 
 The setup: squeeze maximum tokens/sec out of a 6-core/12-thread Intel MacBook,
 fully reproducible, with zero quality loss.
