@@ -284,7 +284,6 @@ Full narrative: [`EXPLANATION.md`](EXPLANATION.md).
 llm-cpu-inference-optimization/
 ├── README.md                 # this case study
 ├── EXPLANATION.md            # full in-depth walkthrough
-├── LINKEDIN_POST.md          # LinkedIn post draft + recommended image
 ├── eval_client.py            # single-stream evaluator (TTFT, tok/s, quality gate)
 ├── concurrent_test.py        # N-client load benchmark
 ├── scripts/                  # launchers, study runners, and the balancer
