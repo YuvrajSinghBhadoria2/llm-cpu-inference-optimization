@@ -84,10 +84,12 @@ we built the study around *reproducibility*:
 
 | threads | 2 | 3 | 4 | 6 | 8 | 12 |
 |---|---|---|---|---|---|---|
-| tok/s | 15.5 | 17.0 | 17.4 | **17.4** | 14.0 | 6.7 |
+| tok/s | 15.5 | 16.0 | 17.0 | 17.4 | 14.0 | 6.7 |
 
 Peak is at the **6 physical cores**; jumping to 12 *logical* threads collapses
 to 6.7 tok/s (Hyper-Thread siblings contend for the same physical core).
+
+![Thread-count sweep — measured medians (0.5B q4)](../assets/figure_threads_bandwidth.png)
 
 **Quantization — Qwen2.5-3B at 6 threads:** q8 = 3.64 → q4 = 7.76 tok/s
 (**2.1×** from weights alone); the full naive→optimized jump is 1.81 → 7.76 =
@@ -117,7 +119,8 @@ Decode tok/s vs `--ctx-size` (KV-cache capacity), fixed prompt + 128 tokens:
 | 2048  | 4.72 |
 | 8192  | 4.43 |
 
-**Flat across a 16× capacity change** — decode is not KV-bound.
+**Flat across a 16× capacity change** — decode is not KV-bound. (Same figure,
+right panel, above.)
 
 ### 4.4 From-scratch decoder (Project 4)
 

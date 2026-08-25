@@ -43,10 +43,13 @@ fact (Part 1) or fails because of it (Parts 2–3).
   8-client load test.
 
 ### What moved the needle
-1. **`--threads` = physical cores, NOT logical.** All 12 logical threads on a
-   6-core chip *collapsed* throughput (Hyper-Thread siblings contend for the 6
-   physical cores). For 0.5B: 6.7 tok/s at 12 threads vs 17.4 at 6. For 3B: 1.8
-   vs 3.6. Fix: `--threads $(sysctl -n hw.physicalcpu)`.
+ 1. **`--threads` = physical cores, NOT logical.** All 12 logical threads on a
+    6-core chip *collapsed* throughput (Hyper-Thread siblings contend for the 6
+    physical cores). For 0.5B: 6.7 tok/s at 12 threads vs 17.4 at 6. For 3B: 1.8
+    vs 3.6. Fix: `--threads $(sysctl -n hw.physicalcpu)`.
+
+![Thread-count sweep and bandwidth characterization — measured medians](../assets/figure_threads_bandwidth.png)
+
 2. **Quantize to `q4`.** At the correct thread count, `q4` decodes ~1.5× faster
    than `q8` — smaller weights → less memory traffic per token (this is the
    bandwidth insight in action).

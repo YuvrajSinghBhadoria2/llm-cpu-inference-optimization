@@ -1,10 +1,17 @@
 # LinkedIn Post — LLM CPU Inference Optimization
 
-**Recommended image:** attach `assets/linkedin_chart.png`. It shows both panels of
-the story — the real 2.5–4.3× win (left) and the "variance trap" where the early
-+36% / −26% claims collapsed to a null on repeated measurement (right). A chart
-beats a screenshot: it makes the honest-null hook instantly legible while
-scrolling. (If you prefer a single static, the right panel alone also works.)
+**Recommended image:** attach `assets/figure_threads_bandwidth.png`. It is a
+real figure generated **directly from the committed `results/` data** (measured
+medians over repeated runs) — not a hand-made chart:
+- **Left panel:** thread-count sweep for 0.5B q4 — decode tok/s peaks at the 6
+  physical cores and collapses at 12 logical threads.
+- **Right panel:** bandwidth characterization for 3B q4 — decode tok/s stays flat
+  across a 16× change in `--ctx-size`, proving the bottleneck is weight memory
+  bandwidth, not KV traffic.
+
+This is the same figure embedded in the README/EXPLANATION, so it is a genuine
+research figure. It makes the core finding instantly legible while scrolling and
+backs the post's credibility (it's our own measured data, not a marketing graphic).
 
 ---
 
