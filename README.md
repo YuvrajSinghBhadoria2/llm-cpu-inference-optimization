@@ -127,6 +127,7 @@ absolute machine load. Runnable via `speculative-decoding/code/run_benchmark.sh`
 # from llama-cpp-opt/package/
 bash speculative-decoding/code/run_benchmark.sh       # (re)generate raw repeats
 python3 speculative-decoding/code/analyze_results.py  # median summary
+python3 speculative-decoding/code/speculative_server.py --K 4 --max-tokens 32  # from-scratch decoder
 ```
 
 > **Honesty note on absolute numbers.** Decode tok/s on this laptop varies with
@@ -158,7 +159,8 @@ llm-cpu-inference-optimization/
     ├── THEORY.md             # original hypothesis (refuted by measurement)
     ├── code/
     │   ├── run_benchmark.sh  # reproducible spec/KV benchmark
-    │   └── analyze_results.py# median summary per config
+    │   ├── analyze_results.py# median summary per config
+    │   └── speculative_server.py # from-scratch dual-server speculative decoder
     └── results/              # raw repeated JSON per configuration (rep_*.json)
 ```
 
@@ -174,6 +176,10 @@ llm-cpu-inference-optimization/
 - **Honest null-result analysis** — repeated speculation & KV-cache runs under
   load, caught that early single-run "gains" were variance, and reported an
   honest *no-reliable-speedup* conclusion instead of a faked win.
+- **Algorithm implementation (from scratch)** — hand-wrote a dual-server
+  speculative decoder (draft proposal, target verification, accept/reject +
+  bonus token) over the HTTP API, and independently reproduced the null result,
+  proving understanding beyond flipping a `--spec-type` flag.
 - **Reproducible packaging** — one-command studies and clear build/run docs.
 
 ## Limitations

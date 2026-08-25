@@ -47,6 +47,33 @@ dominated by **weight** reads: the full ~2 GB model is fetched from memory
 on the same bandwidth, so it cannot net out faster here. This is the correct,
 load-invariant explanation (the earlier "KV traffic" hand-wave was wrong).
 
+### From-scratch implementation (Project 4): we built the decoder ourselves
+
+To prove we understand the algorithm — not just llama.cpp's `--spec-type` — we
+wrote `code/speculative_server.py`: a hand-rolled speculative decoder that starts
+a draft (0.5B) and a target (3B) llama-server, proposes `K` tokens from the
+draft, verifies them against the target's greedy tokens, and accepts the longest
+matching prefix plus the target's corrected (or bonus) token. It runs entirely
+over the OpenAI-compatible HTTP API.
+
+Measured on the same hardware (K=4, 32 tokens, 6 threads):
+
+| mode | tok/s | ratio |
+|---|---|---|
+| baseline (target only, single stream) | 7.27 | 1.00x |
+| from-scratch speculative (draft+target) | 3.99 | 0.55x |
+
+The hand-built decoder is *slower*, for two honest reasons: (1) orchestrating the
+loop over HTTP re-prefills the whole prefix on the target every step, so it does
+strictly more work than one batched call; (2) even an ideal single-pass
+speculative step evaluates `K+1` target positions to emit `K+1` tokens, which on a
+weight-bandwidth-bound CPU cannot beat one token per target forward pass — the
+same conclusion reached from the controlled llama.cpp measurements above.
+
+This is the point: **building it ourselves independently reproduces the null
+result.** The algorithm is correct (it generated coherent text), but it does not
+help on this hardware. Evidence: `results/from_scratch_spec.json`.
+
 ## Why this is the valuable result
 
 A faked "KV-cache +36% / speculation −26%" would not survive replication. By

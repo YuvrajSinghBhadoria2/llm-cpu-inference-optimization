@@ -1,0 +1,14 @@
+{
+  "experiment": "from-scratch speculative decoder (dual-server, hand-written accept/reject loop)",
+  "script": "speculative-decoding/code/speculative_server.py",
+  "config": {"target": "qwen2.5-3b-instruct-q4_k_m.gguf", "draft": "qwen2.5-0.5b-q4_k_m.gguf", "K": 4, "max_tokens": 32, "threads": 6, "prompt": "The capital of France is"},
+  "results": {
+    "baseline_tok_per_s": 7.27,
+    "spec_tok_per_s": 3.99,
+    "spec_baseline_ratio": 0.55,
+    "baseline_tokens": 32,
+    "spec_tokens": 32
+  },
+  "note": "Hand-built decoder is slower because HTTP orchestration re-prefills the prefix each step (strictly more work than one batched call), and an ideal single-pass speculative step still evaluates K+1 target positions per K+1 tokens — which on a weight-bandwidth-bound CPU cannot beat one token per forward pass. Independent reproduction of the null result.",
+  "sample_output": "Paris. The capital of Spain is Madrid. The capital of Italy is Rome. The capital of Germany is Berlin. The capital of Greece is Athens. The capital"
+}
