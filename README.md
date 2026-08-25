@@ -1,3 +1,5 @@
+![CPU inference benchmark](https://github.com/YuvrajSinghBhadoria2/llm-cpu-inference-optimization/actions/workflows/benchmark.yml/badge.svg?branch=master)
+
 # LLM Inference Optimization on CPU — A Measured Case Study
 
 > **Abstract.** We optimize local LLM serving on a 2019 laptop CPU (no GPU) and
