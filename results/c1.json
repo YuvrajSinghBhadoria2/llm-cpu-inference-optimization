@@ -1,0 +1,49 @@
+{
+  "status": "PASS",
+  "metrics": {
+    "tok_per_s_median": 6.53,
+    "tok_per_s_mean": 6.71,
+    "ttft_median_s": 3.442,
+    "p95_ttft_s": 3.846,
+    "exact_match_fraction": 1.0,
+    "overlap_mean": 1.0,
+    "goodput_fraction": 1.0
+  },
+  "details": [
+    {
+      "prompt": "Explain what a vector database is in two",
+      "tok_per_s": 6.53,
+      "ttft_s": 3.507,
+      "exact": true,
+      "overlap": 1.0
+    },
+    {
+      "prompt": "Write a short Python function that rever",
+      "tok_per_s": 6.31,
+      "ttft_s": 2.923,
+      "exact": true,
+      "overlap": 1.0
+    },
+    {
+      "prompt": "Summarize the causes of the French Revol",
+      "tok_per_s": 6.55,
+      "ttft_s": 3.706,
+      "exact": true,
+      "overlap": 1.0
+    },
+    {
+      "prompt": "List three benefits of test-driven devel",
+      "tok_per_s": 8.0,
+      "ttft_s": 2.609,
+      "exact": true,
+      "overlap": 1.0
+    },
+    {
+      "prompt": "Describe how gradient descent works in p",
+      "tok_per_s": 6.14,
+      "ttft_s": 3.442,
+      "exact": true,
+      "overlap": 1.0
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "concurrency": 8,
+  "wall_s": 35.78,
+  "total_tokens": 486,
+  "aggregate_tok_per_s": 13.58,
+  "per_request_tok_per_s_median": 1.81,
+  "per_request_tok_per_s_mean": 1.86,
+  "ttft_median_s": 11.936,
+  "ttft_p95_s": 11.94
+}
