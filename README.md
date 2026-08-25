@@ -108,6 +108,7 @@ cache's memory traffic with `--cache-type-k q4_0 --cache-type-v q4_0`:
 
 | configuration | tok/s | vs baseline |
 |---|---|---|
+| KV-cache q8_0 | 7.30 | 0.94× |
 | **KV-cache q4_0** | **10.56** | **1.36×** |
 
 Reproducible, exact-match preserved (1.0). This is the real additional
