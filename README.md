@@ -263,7 +263,14 @@ python3 speculative-decoding/code/speculative_server.py --K 4 --max-tokens 32
 
 # 5) Part 3
 python3 bandwidth-characterization/code/analyze.py
+
+# 6) Batch-size balancer (dynamic --parallel under concurrency)
+bash scripts/run_balancer.sh
+python3 scripts/plot_balancer.py results/balancer.json assets/balancer_plot.png
 ```
+
+CI: `.github/workflows/benchmark.yml` builds llama.cpp and runs the balancer on
+every push; artifacts are uploaded to the Actions run.
 Paths are configurable via env (`LLAMA`, `MODEL_DIR`, `MODEL`, `THREADS`, `PORT`).
 Full narrative: [`EXPLANATION.md`](EXPLANATION.md).
 
@@ -275,18 +282,30 @@ Full narrative: [`EXPLANATION.md`](EXPLANATION.md).
 llm-cpu-inference-optimization/
 ├── README.md                 # this case study
 ├── EXPLANATION.md            # full in-depth walkthrough
+├── LINKEDIN_POST.md          # LinkedIn post draft + recommended image
 ├── eval_client.py            # single-stream evaluator (TTFT, tok/s, quality gate)
 ├── concurrent_test.py        # N-client load benchmark
-├── scripts/                  # serve_*.sh launchers + run_study/sweep/scale
-├── results/                  # Part 1 raw JSON + results.md + frozen references
+├── scripts/                  # launchers, study runners, and the balancer
+│   ├── serve_qwen25_*.sh     # server launchers (optimized 3B, etc.)
+│   ├── run_study.sh / run_sweep.sh / scale_study.sh
+│   ├── balancer.py           # dynamic --parallel recommender + A/B runner
+│   ├── run_balancer.sh       # runs the balancer A/B -> results/balancer.json
+│   └── plot_balancer.py      # plots the A/B evidence
+├── results/                  # all raw JSON evidence + results.md + frozen refs
+│   ├── sweep_t*.json, scale_*.json, baseline.json, conc_*.json
+│   └── balancer.json         # batch-size balancer A/B evidence
+├── assets/                   # figures embedded in README/EXPLANATION
+│   ├── figure_threads_bandwidth.png
+│   └── balancer_plot.png
 ├── bandwidth-characterization/  # Part 3: ctx-size sweep
 │   ├── README.md
 │   ├── code/analyze.py
 │   └── results/ctx_{512,2048,8192}.json
-└── speculative-decoding/     # Part 2 + Project 4
-    ├── README.md, THEORY.md
-    ├── code/{run_benchmark.sh, analyze_results.py, speculative_server.py}
-    └── results/rep_*.json, from_scratch_spec.json
+├── speculative-decoding/     # Part 2 + Project 4
+│   ├── README.md, THEORY.md
+│   ├── code/{run_benchmark.sh, analyze_results.py, speculative_server.py}
+│   └── results/rep_*.json, from_scratch_spec.json
+└── .github/workflows/benchmark.yml  # CI: build llama.cpp + run balancer on push
 ```
 
 ## 10. Limitations
