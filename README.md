@@ -72,6 +72,34 @@ Paths are configurable via env (`LLAMA`, `MODEL_DIR`, `MODEL`, `THREADS`, `PORT`
 - Size `--parallel` to expected concurrency, not to 1.
 - Validate the BLAS/Metal backend on the actual hardware; "default build" can crash.
 
+## Extension: speculative decoding & KV-cache quantization (a CPU reality check)
+`speculative-decoding/` extends this study with a second, deliberately honest
+investigation: does speculative decoding add the projected 1.5–2× on a
+bandwidth-bound laptop CPU?
+
+**No — it regresses.** Measured on Qwen2.5-3B q4 @ 6 threads (baseline 7.76 tok/s):
+
+| configuration | tok/s | vs baseline |
+|---|---|---|
+| baseline (no spec) | 7.76 | — |
+| 0.5B draft, K=4 | 5.75 | 0.74× |
+| 1.5B draft, K=4 | 3.29 | 0.42× |
+| ngram-simple, K=4 | 3.06 | 0.39× |
+| **KV-cache q4_0** | **10.56** | **1.36×** |
+
+The draft acceptance rate landed in the *predicted* 0.44–0.54 range, so the
+draft quality was fine — but laptop decode is **memory-bandwidth bound**, and the
+draft's own weight/activation reads on the same 6 cores cost more than the saved
+target forward passes. ngram speculation (no neural draft) also regressed,
+proving the limit is shared memory bandwidth, not core contention. The real,
+reproducible additional lever on this hardware is **KV-cache quantization**
+(`--cache-type-k q4_0 --cache-type-v q4_0`, +36%, exact-match preserved).
+
+End-to-end 3B vs naive (q8, 12 threads = 1.81 tok/s): **1.81 → 10.56 ≈ 5.8×**
+(threads + q4 + KV-cache quant). See `speculative-decoding/README.md` for the
+full theory-vs-measurement writeup and `speculative-decoding/THEORY.md` for the
+original hypothesis.
+
 ## Repository structure
 ```
 llm-cpu-inference-optimization/
@@ -85,10 +113,14 @@ llm-cpu-inference-optimization/
 │   ├── run_study.sh          # baseline + 3 candidates
 │   ├── run_sweep.sh          # thread-count sweep
 │   └── scale_study.sh        # 1.5B + 3B generalization
-└── results/
-    ├── results.md            # full narrative writeup
-    ├── *.json                # raw measurements (sweep, scale, concurrent)
-    └── reference_outputs*.json  # frozen quality references
+├── results/
+│   ├── results.md            # full narrative writeup
+│   ├── *.json                # raw measurements (sweep, scale, concurrent)
+│   └── reference_outputs*.json  # frozen quality references
+└── speculative-decoding/     # extension: theory vs measurement
+    ├── README.md             # measured results (negative + KV-cache win)
+    ├── THEORY.md             # original hypothesis (refuted by measurement)
+    └── results/              # raw JSON per configuration
 ```
 
 ## Skills demonstrated
@@ -100,6 +132,9 @@ llm-cpu-inference-optimization/
   so speed changes never silently alter results.
 - **Rigorous experimentation** — explicit baselines, negative-result capture, and
   cross-size generalization rather than a single anecdote.
+- **Honest negative-result analysis** — measured that speculative decoding
+  *regresses* on a bandwidth-bound laptop CPU and reported it instead of a faked
+  win; identified KV-cache quantization as the real additional lever.
 - **Reproducible packaging** — one-command studies and clear build/run docs.
 
 ## Limitations
