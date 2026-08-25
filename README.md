@@ -8,6 +8,9 @@ thread/quantization settings deliver a **~4× decode-speedup at identical output
 quality** (exact token-match preserved). The naive defaults (`--threads = logical
 core count`, `q8`) were the *worst* configuration tested.
 
+> **Full in-depth walkthrough** (premise, every part, the algorithm, and the
+> rigor behind the null result): see [`EXPLANATION.md`](EXPLANATION.md).
+
 | model | naive (q8, 12 threads) | optimized (q4, 6 threads) | speedup |
 |---|---|---|---|
 | Qwen2.5-0.5B | 6.67 tok/s | **26.85 tok/s** | **4.0×** |
