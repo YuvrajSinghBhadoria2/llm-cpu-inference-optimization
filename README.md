@@ -130,22 +130,64 @@ from-scratch spec **3.99** tok/s (**0.55×**). It generates coherent text and
 
 ## 5. What we found
 
-- **Physical cores beat logical threads.** Hyper-Threading hurts inference
-  because the two siblings share one physical core's resources while both contend
-  for memory bandwidth. `threads = hw.physicalcpu` is the single highest-leverage
-  setting.
-- **`q4` beats `q8`** because smaller weights mean less memory traffic per token
-  — the bandwidth insight in action.
-- **Batching only pays off under concurrency.** Optimizing for one user is a
-  different problem than optimizing for many.
-- **Speculative decoding and KV-cache quantization do NOT reliably help here.**
-  KV-cache `q4_0` was marginally *slower*; speculation's repeats landed on both
-  sides of baseline. The original "CPU speculation helps" hypothesis is **not
-  supported by repeated measurement**.
-- **The real bottleneck is weight bandwidth.** The ctx-size sweep proves decode
-  cost is the full model fetched every token, not KV traffic. This single fact
-  explains both the Part 1 win (smaller weights) and the Part 2 null (a draft
-  model only adds target compute on the same bandwidth).
+### 5.1 Physical cores beat logical threads — and Hyper-Threading actively hurts
+**Finding:** `--threads` = the 6 *physical* cores gave ~17.4 tok/s for 0.5B
+versus 6.7 at the 12-thread default — a ~2.6× difference from a one-line change.
+**Why:** Hyper-Threading shows the OS 12 "CPUs", but they are 6 physical cores,
+each with two *siblings* that share the same execution units **and the same path
+to memory**. Decoding is memory-bound, so throughput is gated by how fast the
+single memory bus can feed one core. Adding the sibling thread doesn't add a
+second bus — it just makes the two siblings fight over the same bus and the same
+L1/L2 cache, reducing total useful work. The fix is trivial and high-leverage:
+`--threads $(sysctl -n hw.physicalcpu)`.
+
+### 5.2 `q4` beats `q8` because it moves fewer bytes per token
+**Finding:** at 6 threads, 3B went from 3.64 (q8) to 7.76 tok/s (q4) — a 2.1×
+gain from weights alone.
+**Why:** generating one token requires reading the *entire* model from RAM.
+`q4` stores each weight in ~4 bits instead of 8, so the model is about half the
+size and **half the bytes must cross the memory bus per token**. Less data moved
+= less time waiting on bandwidth = faster decode. This is the bandwidth insight
+made concrete.
+
+### 5.3 Batching helps only when there are concurrent users
+**Finding:** a single client saw no gain from `--parallel`; 8 concurrent clients
+gained +45% aggregate throughput and ~4× lower tail latency.
+**Why:** with one request, the cores are already busy on that stream, so there
+is nothing to parallelize. With many requests, batching lets the cores switch
+between them while waiting on memory, raising utilization. The optimization
+target differs by workload — tail latency for one user vs aggregate throughput
+for many.
+
+### 5.4 Speculative decoding and KV-cache quantization do NOT reliably help here
+**Finding:** repeated runs gave baseline 4.10, KV-cache `q4_0` 3.75 (slower),
+and spec 0.5B K=4 4.70 (noisy, spanning both sides of baseline). No reliable
+speedup.
+**Why the intuition fails:** the textbook argument is "a small draft model
+guesses several tokens, the big model verifies them in one pass, so we get
+several tokens for the price of one." That holds on **compute-bound** hardware
+(GPUs), where the big model's forward pass is the expensive part. On this
+**bandwidth-bound CPU**, the big model's forward pass is *cheap relative to the
+weight-fetch*; the draft model only adds more weight-fetches on the same bus.
+Net result: no win, occasionally a loss.
+
+### 5.5 The real bottleneck is weight memory bandwidth (the unifying insight)
+**Finding:** varying `--ctx-size` from 512 → 8192 (16× more KV capacity) left
+decode flat at ~4.3–4.7 tok/s.
+**Why this matters:** during generation the *active* KV length is just prompt +
+generated tokens, **not** the allocated capacity — so KV size isn't the limit.
+The limit is the **full model re-read on every single token**. We can make this
+quantitative: Qwen2.5-3B q4 is ~1.9 GB; this laptop's DDR4 bandwidth is
+~30–40 GB/s, so the theoretical ceiling from moving weights alone is ~1.9/35 ≈
+**15–20 tok/s**. We measure ~7.8 — i.e., we are squarely in the **bandwidth-
+limited regime** (far from any compute limit), which is exactly why the
+optimizations behave as they do:
+- **Why Part 1 won:** smaller weights (`q4`) and fewer wasted fetches (physical
+  cores) both reduce bytes moved per token.
+- **Why Part 2 was a null:** a draft model or smaller KV only trims a few percent
+  of traffic on a bus already saturated moving the weights.
+
+This single fact turns three separate observations into one coherent story.
 
 ---
 
