@@ -48,7 +48,7 @@ fact (Part 1) or fails because of it (Parts 2–3).
     physical cores). For 0.5B: 6.7 tok/s at 12 threads vs 17.4 at 6. For 3B: 1.8
     vs 3.6. Fix: `--threads $(sysctl -n hw.physicalcpu)`.
 
-![Thread-count sweep and bandwidth characterization — measured medians](../assets/figure_threads_bandwidth.png)
+![Thread-count sweep and bandwidth characterization — measured medians](assets/figure_threads_bandwidth.png)
 
 2. **Quantize to `q4`.** At the correct thread count, `q4` decodes ~1.5× faster
    than `q8` — smaller weights → less memory traffic per token (this is the
@@ -61,7 +61,7 @@ fact (Part 1) or fails because of it (Parts 2–3).
     ~8.6× lower tail latency**). `scripts/balancer.py` turns this into a reusable
     controller that picks `--parallel` from the live request count.
 
-![Batch-size balancer A/B — measured](../assets/balancer_plot.png)
+![Batch-size balancer A/B — measured](assets/balancer_plot.png)
 4. **Build without Metal** (stability).
 
 ### Headline result
